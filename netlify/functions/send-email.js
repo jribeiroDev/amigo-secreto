@@ -59,10 +59,27 @@ export const handler = async (event) => {
   }
 
   try {
+    console.log("🚀 Iniciando handler de envio de email");
+
+    // Verificar variáveis de ambiente
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+      console.error("❌ Variáveis de ambiente não configuradas");
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: "Servidor não configurado corretamente",
+        }),
+      };
+    }
+
     // Verificar limite diário
+    console.log("📊 Verificando limite diário...");
     const limitCheck = await checkDailyLimit();
 
     if (!limitCheck.allowed) {
+      console.warn("⚠️ Limite diário atingido");
       return {
         statusCode: 429,
         headers,
@@ -79,6 +96,8 @@ export const handler = async (event) => {
       };
     }
 
+    console.log("✅ Limite OK:", limitCheck);
+
     const {
       to,
       subject,
@@ -91,6 +110,7 @@ export const handler = async (event) => {
 
     // Validação
     if (!to || !giverName || !receiverName || !eventName) {
+      console.error("❌ Dados incompletos");
       return {
         statusCode: 400,
         headers,
@@ -332,13 +352,19 @@ Boas compras!
       `,
     };
 
+    console.log("📧 Enviando email com retry...");
+
     // Enviar email com retry
     const info = await sendEmailWithRetry(transporter, mailOptions);
+
+    console.log("✅ Email enviado, incrementando contador...");
 
     // Incrementar contador após envio bem-sucedido
     await incrementCounter();
 
     const stats = await getStats();
+
+    console.log("✅ Sucesso! Stats:", stats);
 
     return {
       statusCode: 200,

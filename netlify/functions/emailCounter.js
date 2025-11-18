@@ -1,11 +1,15 @@
 // Módulo de contador de emails para Netlify Functions
-// Usa Netlify Blobs para persistência entre invocações
-
-import { getStore } from "@netlify/blobs";
+// Usa Netlify Blobs em produção e fallback para memória em dev/local
 
 const DAILY_LIMIT = 450;
 const STORE_NAME = "email-counter";
 const COUNTER_KEY = "daily-counter";
+
+// Fallback: cache em memória para ambiente local/dev
+let memoryCache = {
+  date: getCurrentDate(),
+  count: 0,
+};
 
 /**
  * Obtém data atual no formato YYYY-MM-DD
@@ -16,18 +20,42 @@ function getCurrentDate() {
 }
 
 /**
- * Obtém o store do Netlify Blobs
+ * Verifica se está rodando no Netlify (produção)
  */
-function getCounterStore() {
-  return getStore(STORE_NAME);
+function isNetlifyEnvironment() {
+  return process.env.NETLIFY === "true" || process.env.CONTEXT !== undefined;
 }
 
 /**
- * Lê os dados do contador do Netlify Blobs
+ * Obtém o store do Netlify Blobs (somente em produção)
+ */
+async function getCounterStore() {
+  if (!isNetlifyEnvironment()) {
+    return null;
+  }
+
+  try {
+    const { getStore } = await import("@netlify/blobs");
+    return getStore(STORE_NAME);
+  } catch (error) {
+    console.warn("⚠️ Netlify Blobs não disponível, usando cache em memória");
+    return null;
+  }
+}
+
+/**
+ * Lê os dados do contador
  */
 async function getCounterData() {
   try {
-    const store = getCounterStore();
+    const store = await getCounterStore();
+
+    // Se não há Blobs disponível (local), usa memória
+    if (!store) {
+      return memoryCache;
+    }
+
+    // Produção: lê do Netlify Blobs
     const data = await store.get(COUNTER_KEY, { type: "json" });
 
     if (!data) {
@@ -36,17 +64,25 @@ async function getCounterData() {
 
     return data;
   } catch (error) {
-    console.error("❌ Erro ao ler contador do Blobs:", error);
-    return { date: getCurrentDate(), count: 0 };
+    console.error("❌ Erro ao ler contador:", error);
+    return memoryCache;
   }
 }
 
 /**
- * Salva os dados do contador no Netlify Blobs
+ * Salva os dados do contador
  */
 async function saveCounterData(data) {
   try {
-    const store = getCounterStore();
+    const store = await getCounterStore();
+
+    // Se não há Blobs disponível (local), salva na memória
+    if (!store) {
+      memoryCache = data;
+      return;
+    }
+
+    // Produção: salva no Netlify Blobs
     await store.setJSON(COUNTER_KEY, data);
   } catch (error) {
     console.error("❌ Erro ao salvar contador no Blobs:", error);
