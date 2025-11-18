@@ -12,10 +12,6 @@ dist
 dist-ssr
 *.local
 
-# Email counter data
-server/email-counter.json
-netlify/functions/email-counter.json
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

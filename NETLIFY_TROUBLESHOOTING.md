@@ -1,5 +1,82 @@
 # 🔧 Troubleshooting - Deploy Netlify
 
+## ❌ Problema: Cannot find module 'nodemailer' (MAIS COMUM)
+
+**Erro nos logs:**
+
+```
+ERROR  Uncaught Exception
+Runtime.ImportModuleError: Error: Cannot find module 'nodemailer'
+```
+
+### Causa:
+
+As dependências das functions não foram incluídas no deploy.
+
+### ✅ Solução DEFINITIVA:
+
+#### Opção 1: Usar script de deploy (RECOMENDADO)
+
+```powershell
+# Windows PowerShell
+.\deploy.ps1
+```
+
+```bash
+# Linux/Mac
+chmod +x deploy.sh
+./deploy.sh
+```
+
+#### Opção 2: Manual
+
+```bash
+# 1. Instalar dependências das functions
+cd netlify/functions
+npm install
+
+# 2. Adicionar ao git (IMPORTANTE!)
+cd ../..
+git add netlify/functions/node_modules
+git add netlify/functions/package*.json
+git commit -m "chore: add functions dependencies"
+
+# 3. Build
+npm run build
+
+# 4. Deploy
+netlify deploy --prod
+```
+
+#### Opção 3: Configuração automática (já feito)
+
+O arquivo `netlify.toml` já está configurado para instalar dependências automaticamente:
+
+```toml
+[build]
+  command = "npm run build && cd netlify/functions && npm install"
+```
+
+**MAS** isso só funciona se o `package.json` estiver commitado!
+
+### ⚠️ IMPORTANTE:
+
+1. **SEMPRE commite os arquivos:**
+
+   ```bash
+   git add netlify/functions/package.json
+   git add netlify/functions/package-lock.json
+   git add netlify/functions/node_modules
+   ```
+
+2. **O `.gitignore` já está configurado** para permitir `netlify/functions/node_modules`
+
+3. **Após commit, faça push e redeploy:**
+   ```bash
+   git push
+   netlify deploy --prod
+   ```
+
 ## ❌ Problema: Erro 502 (Bad Gateway)
 
 ### Causas Possíveis:
@@ -14,6 +91,7 @@
 #### 1. Verificar Variáveis de Ambiente
 
 No painel do Netlify:
+
 - Site settings → Environment variables
 - Verifique se `GMAIL_USER` e `GMAIL_APP_PASSWORD` estão configuradas
 - **IMPORTANTE**: Após adicionar, faça um novo deploy!
@@ -41,6 +119,7 @@ npm install
 ```
 
 Certifique-se que `package.json` tem:
+
 ```json
 {
   "type": "module",
@@ -68,6 +147,7 @@ Este erro é causado por conflito com extensões de carteira cripto (MetaMask, e
 **Não afeta o funcionamento no Netlify!** Este é um erro local do browser.
 
 Para testar localmente sem o erro:
+
 1. Use navegador em modo anônimo
 2. Ou desative extensões de cripto
 3. Ou ignore (não afeta produção)
@@ -77,6 +157,7 @@ Para testar localmente sem o erro:
 ### Verificações:
 
 1. **Senha de App do Gmail está correta?**
+
    ```bash
    # Teste localmente primeiro
    cd server
@@ -86,9 +167,11 @@ Para testar localmente sem o erro:
    ```
 
 2. **Email está no spam?**
+
    - Verifique a pasta de spam do destinatário
 
 3. **Limite do Gmail atingido?**
+
    - Verifique os logs: `📊 Email contador: X/450`
    - Gmail tem limite de 500 emails/dia
 
@@ -98,17 +181,20 @@ Para testar localmente sem o erro:
 ## ❌ Problema: Function Timeout (10 segundos)
 
 ### Causa:
+
 Plano gratuito do Netlify limita functions a 10 segundos.
 
 ### ✅ Solução:
 
 O código já está otimizado com:
+
 - Retry com backoff exponencial (máx 3 tentativas)
 - Timeout total: ~7 segundos (dentro do limite)
 
 Se ainda assim houver timeout:
 
 1. **Reduzir tentativas de retry:**
+
    ```javascript
    // Em send-email.js
    async function sendEmailWithRetry(transporter, mailOptions, maxRetries = 2) {
@@ -121,15 +207,18 @@ Se ainda assim houver timeout:
 ## ❌ Problema: Netlify Blobs não funciona localmente
 
 ### Explicação:
+
 Netlify Blobs **só funciona em produção** no Netlify.
 
 ### ✅ Solução:
 
 O código já está preparado com **fallback automático**:
+
 - **Local/Dev**: Usa cache em memória
 - **Produção Netlify**: Usa Netlify Blobs
 
 Para testar com Blobs localmente:
+
 ```bash
 netlify dev
 ```
